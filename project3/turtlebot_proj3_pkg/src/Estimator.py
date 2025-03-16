@@ -247,10 +247,38 @@ class DeadReckoning(Estimator):
         self.canvas_title = 'Dead Reckoning'
 
     def update(self, _):
+        # Ensure we only use self.u (inputs) and self.x[0] (initial state)
         if len(self.x_hat) > 0 and self.x_hat[-1][0] < self.x[-1][0]:
-            # TODO: Your implementation goes here!
-            # You may ONLY use self.u and self.x[0] for estimation
-            raise NotImplementedError
+            # Retrieve parameters
+            r = self.r  # Wheel radius
+            d = self.d  # Half track width
+
+            # Initialize estimated states
+            if not self.x_hat:
+                self.x_hat.append(self.x[0])  # Use initial state
+
+            # Get last estimated state
+            t_last, theta_last, x_last, y_last, _, _ = self.x_hat[-1]
+
+            # Find corresponding control input
+            for u_t, omega_l, omega_r in self.u:
+                if u_t > t_last:
+                    break
+            
+            # Compute velocities
+            v = r * (omega_l + omega_r) / 2  # Linear velocity
+            omega = r * (omega_r - omega_l) / (2 * d)  # Angular velocity
+
+            # Time step
+            dt = self.dt
+
+            # Update state using unicycle model
+            theta_new = theta_last + omega * dt
+            x_new = x_last + v * np.cos(theta_last) * dt
+            y_new = y_last + v * np.sin(theta_last) * dt
+
+            # Append new estimate
+            self.x_hat.append([u_t, theta_new, x_new, y_new, 0, 0])
 
 
 class KalmanFilter(Estimator):
