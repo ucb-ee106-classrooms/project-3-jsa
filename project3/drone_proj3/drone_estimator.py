@@ -208,10 +208,25 @@ class DeadReckoning(Estimator):
 
     def update(self, _):
         if len(self.x_hat) > 0:
-            # TODO: Your implementation goes here!
-            # You may ONLY use self.u and self.x[0] for estimation
-            raise NotImplementedError
+            
+            # Init estimated states
+            if not self.x_hat:
+                self.x_hat.append(self.x[0])
 
+            # Get last estimated state
+            xpos_old, zpos_old, theta_old, xvel_old, zvel_old, omega_old = self.x_hat[-1]
+            u1, u2 = self.u[-1]
+
+            xpos_new = xpos_old + self.dt * (xvel_old)
+            zpos_new = zpos_old + self.dt * (zvel_old)
+            theta_new = theta_old + self.dt * (omega_old)
+            xvel_new = xvel_old + self.dt * (- np.sin(theta_old) / self.m) * u1
+            zvel_new = zvel_old + self.dt * (((np.cos(theta_old) / self.m) * u1) - self.gr)
+            omega_new = omega_old  + self.dt * (u2 / self.J)
+
+            # Append estimate
+            self.x_hat.append([xpos_new, zpos_new, theta_new, xvel_new, zvel_new, omega_new])
+            
 # noinspection PyPep8Naming
 class ExtendedKalmanFilter(Estimator):
     """Extended Kalman filter estimator.
@@ -258,13 +273,38 @@ class ExtendedKalmanFilter(Estimator):
             raise NotImplementedError
 
     def g(self, x, u):
-        raise NotImplementedError
+        xpos_old, zpos_old, theta_old, xvel_old, zvel_old, omega_old = x
+        u1, u2 = u
+
+        xpos_new = xpos_old + self.dt * (xvel_old)
+        zpos_new = zpos_old + self.dt * (zvel_old)
+        theta_new = theta_old + self.dt * (omega_old)
+        xvel_new = xvel_old + self.dt * (- np.sin(theta_old) / self.m) * u1
+        zvel_new = zvel_old + self.dt * (((np.cos(theta_old) / self.m) * u1) - self.gr)
+        omega_new = omega_old  + self.dt * (u2 / self.J)
+
+        return np.array([xpos_new, zpos_new, theta_new, xvel_new, zvel_new, omega_new])
 
     def h(self, x, y_obs):
-        raise NotImplementedError
+        xpos_old, zpos_old, theta_old, xvel_old, zvel_old, omega_old = x
+        dist, theta = y_obs
+        lz = np.cos(theta) * dist
+        lx = np.sin(theta) * dist
+
+        out = np.array([np.sqrt((lx - xpos_old)**2 + (lz - zpos_old)**2), theta_old])
+        return out
 
     def approx_A(self, x, u):
-        raise NotImplementedError
+        xpos_old, zpos_old, theta_old, xvel_old, zvel_old, omega_old = x
+        u1, u2 = u
+
+        t1 = - u1 * np.cos(theta_old) / self.m
+        t2 = - u1 * np.sin(theta_old) / self.m
+
+        A = np.eye(6) + self.dt * (np.array([[0,0,0,1,0,0],[0,0,0,0,1,0],[0,0,0,0,0,1],[0,0,t1,0,0,0],[0,0,t2,0,0,0],[0,0,0,0,0,0]]))
+        return A
     
-    def approx_C(self, x):
-        raise NotImplementedError
+    def approx_C(self, x, y_obs):
+
+        Capprox = np.array([[],[]])
+        return Capprox
