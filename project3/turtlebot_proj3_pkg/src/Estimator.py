@@ -307,17 +307,87 @@ class KalmanFilter(Estimator):
         super().__init__()
         self.canvas_title = 'Kalman Filter'
         self.phid = np.pi / 4
-        # TODO: Your implementation goes here!
-        # You may define the A, C, Q, R, and P matrices below.
+        
+        # State transition matrix (A)
+        self.A = np.eye(4)
+        
+        # Control input matrix (B)
+        self.B = np.array([
+            [self.r / 2 * np.cos(self.phid), self.r / 2 * np.cos(self.phid)],
+            [self.r / 2 * np.sin(self.phid), self.r / 2 * np.sin(self.phid)],
+            [1, 0],
+            [0, 1]
+        ]) * self.dt
+        
+        # Measurement matrix (C)
+        self.C = np.array([
+            [1, 0, 0, 0], # x 
+            [0, 1, 0, 0]  # y
+        ])
+        
+        # Process noise covariance (Q)
+        self.Q = np.eye(4) * 0.01
+        
+        # Measurement noise covariance (R)
+        self.R = np.eye(2) * 0.03
+        
+        # Initial error covariance (P0)
+        self.P = np.eye(4) * 0.5
 
     # noinspection DuplicatedCode
     # noinspection PyPep8Naming
     def update(self, _):
         if len(self.x_hat) > 0 and self.x_hat[-1][0] < self.x[-1][0]:
-            # TODO: Your implementation goes here!
-            # You may use self.u, self.y, and self.x[0] for estimation
-            raise NotImplementedError
-
+            # Get last estimated state
+            last_t = self.x_hat[-1][0]
+            
+            # Control input and measurement
+            u_t = None
+            y_t = None
+            
+            # Get most recent control input
+            for inp in self.u:
+                if inp[0] > last_t: # Make sure is most recent
+                    u_t = inp[1:]  # Extract control values (left and right wheel speeds)
+                    break
+            
+            # Get most recent measurement
+            for meas in self.y:
+                if meas[0] > last_t: # Make sure is most recent
+                    y_t = meas[1:]  # Get x and y positions
+                    current_t = meas[0]  # Get timestamp
+                    break
+            
+            # Current state estimate
+            _, _, x_prev, y_prev, theta_l_prev, theta_r_prev = self.x_hat[-1]
+            x_state = np.array([x_prev, y_prev, theta_l_prev, theta_r_prev])
+            
+            # State extrapolation
+            x_prior = np.dot(self.A, x_state) + np.dot(self.B, u_t)
+            
+            # Covariance extrapolation
+            P_prior = np.dot(np.dot(self.A, self.P), self.A.T) + self.Q
+            
+            # Kalman gain
+            K_t = np.dot(np.dot(P_prior, self.C.T), 
+                         np.linalg.inv(np.dot(np.dot(self.C, P_prior), self.C.T) + self.R))
+            
+            # State update (correction)
+            measurement = np.array(y_t)
+            measurement_residual = measurement - np.dot(self.C, x_prior)
+            x_posterior = x_prior + np.dot(K_t, measurement_residual)
+            
+            # Step 9: Covariance update
+            I = np.eye(self.P.shape[0])
+            self.P = np.dot((I - np.dot(K_t, self.C)), P_prior)
+            
+            # Create new state estimate in the required format
+            # [timestamp, bearing, x, y, theta_left, theta_right]
+            new_state = [current_t, self.phid, x_posterior[0], x_posterior[1], 
+                         x_posterior[2], x_posterior[3]]
+            
+            # Append new estimate
+            self.x_hat.append(new_state)
 
 # noinspection PyPep8Naming
 class ExtendedKalmanFilter(Estimator):
@@ -360,4 +430,3 @@ class ExtendedKalmanFilter(Estimator):
             # TODO: Your implementation goes here!
             # You may use self.u, self.y, and self.x[0] for estimation
             raise NotImplementedError
-
