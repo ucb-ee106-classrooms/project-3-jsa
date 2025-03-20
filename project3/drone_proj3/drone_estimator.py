@@ -261,16 +261,49 @@ class ExtendedKalmanFilter(Estimator):
         self.A = None
         self.B = None
         self.C = None
-        self.Q = None
-        self.R = None
-        self.P = None
+        self.Q = np.eye(6) * 0.01
+        self.R = np.eye(2) * 0.3
+        self.P = np.eye(6) * 0.5
 
     # noinspection DuplicatedCode
     def update(self, i):
         if len(self.x_hat) > 0: #and self.x_hat[-1][0] < self.x[-1][0]:
-            # TODO: Your implementation goes here!
-            # You may use self.u, self.y, and self.x[0] for estimation
-            raise NotImplementedError
+            
+            # Init estimated states
+            if not self.x_hat:
+                self.x_hat.append(self.x[0])
+
+            # grab recent time step
+            xpos_old, zpos_old, theta_old, xvel_old, zvel_old, omega_old = self.x_hat[-1]
+            u1, u2 = self.u[-1]
+
+            prev_x_hat = self.x_hat[-1]
+            prev_in = self.u[-1]
+            
+            # state extrapolation
+            xhat_t = self.g(prev_x_hat, prev_in)
+
+            # dynamics linearization
+            self.A = self.approx_A(prev_x_hat, prev_in)
+
+            # covariance extrapolation
+            P_t = np.matmul(self.A, np.matmul(self.P, self.A.T)) + self.Q 
+
+            # measurement linearization
+            self.C = self.approx_C(prev_x_hat)
+
+            # kalman gain
+            inv = np.linalg.inv(np.matmul(self.C, np.matmul(P_t, self.C.T)) + self.R)
+            K = np.matmul(P_t,np.matmul(self.C.T, inv))
+
+            # state update
+            ydiff = self.y[-1] - self.h(xhat_t, 0)
+            xhat_new = xhat_t + np.matmul(K, ydiff)
+
+            # covariance update
+            self.P = np.matmul((np.eye(6) - np.matmul(K, self.C)), P_t)
+
+            self.x_hat.append(xhat_new)
 
     def g(self, x, u):
         xpos_old, zpos_old, theta_old, xvel_old, zvel_old, omega_old = x
@@ -287,11 +320,11 @@ class ExtendedKalmanFilter(Estimator):
 
     def h(self, x, y_obs):
         xpos_old, zpos_old, theta_old, xvel_old, zvel_old, omega_old = x
-        dist, theta = y_obs
-        lz = np.cos(theta) * dist
-        lx = np.sin(theta) * dist
+        lz = self.landmark[2]
+        ly = self.landmark[1]
+        lx = self.landmark[0]
 
-        out = np.array([np.sqrt((lx - xpos_old)**2 + (lz - zpos_old)**2), theta_old])
+        out = np.array([np.sqrt((lx - xpos_old)**2 + ly**2 +(lz - zpos_old)**2), theta_old])
         return out
 
     def approx_A(self, x, u):
@@ -304,7 +337,14 @@ class ExtendedKalmanFilter(Estimator):
         A = np.eye(6) + self.dt * (np.array([[0,0,0,1,0,0],[0,0,0,0,1,0],[0,0,0,0,0,1],[0,0,t1,0,0,0],[0,0,t2,0,0,0],[0,0,0,0,0,0]]))
         return A
     
-    def approx_C(self, x, y_obs):
+    def approx_C(self, x):
+        xpos_old, zpos_old, theta_old, xvel_old, zvel_old, omega_old = x
+        
+        lz = self.landmark[2]
+        ly = self.landmark[1]
+        lx = self.landmark[0]
 
-        Capprox = np.array([[],[]])
+        cons = -1/np.sqrt((lx - xpos_old)**2 + ly**2 +(lz - zpos_old)**2)
+
+        Capprox = np.array([[cons * (lx-xpos_old), (cons* (lz - zpos_old)),0,0,0,0],[0,0,1,0,0,0]])
         return Capprox
