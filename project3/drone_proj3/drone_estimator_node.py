@@ -55,7 +55,13 @@ def main():
         raise RuntimeError(
             'Estimator type {} not supported'.format(estimator_type))
     print('Invoking estimator {}...'.format(estimator_type))
-    spin(estimator)
+
+    try:
+        spin(estimator)
+    except KeyboardInterrupt:
+        pass
+    print("RMSE: ", estimator.compute_rmse())
+    print("Avg. time: ", estimator.compute_time() * 1000, " ms")
 
 
 if __name__ == '__main__':

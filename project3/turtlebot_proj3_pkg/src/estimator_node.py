@@ -51,8 +51,14 @@ def main():
     else:
         raise RuntimeError(
             'Estimator type {} not supported'.format(estimator_type))
-    rospy.loginfo('Invoking estimator {}...'.format(estimator_type))
+    rospy.loginfo('Invoking estimator {}...'.format(estimator_type))    
     spin(estimator)
+
+    print("RMSE: ", estimator.compute_rmse()) 
+    # print("NEES: ", estimator.compute_nees()) 
+    print("Avg. time: ", estimator.compute_time() * 1000, " ms")
+
+    # print rmse and nees
 
 
 if __name__ == '__main__':

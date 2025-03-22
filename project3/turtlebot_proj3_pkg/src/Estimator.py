@@ -77,6 +77,9 @@ class Estimator:
         self.x = []
         self.y = []
         self.x_hat = []  # Your estimates go here!
+
+        self.time = []
+
         self.dt = 0.1
         self.fig, self.axd = plt.subplot_mosaic(
             [['xy', 'phi'],
@@ -114,6 +117,12 @@ class Estimator:
         self.y.append(msg.data)
 
     def update(self, _):
+        start_compute_time = rospy.get_time()
+        self._update(_)
+        end_compute_time = rospy.get_time()
+        self.time.append(end_compute_time - start_compute_time)
+
+    def _update(self, _):
         raise NotImplementedError
 
     def plot_init(self):
@@ -198,6 +207,54 @@ class Estimator:
         ylim = ax.get_ylim()
         ax.set_ylim([min(min(y) * 1.05, ylim[0]), max(max(y) * 1.05, ylim[1])])
 
+    def compute_rmse(self):
+        """Compute the root mean squared error (RMSE) of the estimator.
+
+        Returns
+        -------
+            float
+                The RMSE of the estimator.
+        """
+        if len(self.x) == 0 or len(self.x_hat) == 0:
+            return 0.0
+        
+        x_hat = self.x_hat[:len(self.x)]
+        x = np.array(self.x)[:, 1:4]
+        x_hat = np.array(x_hat)[:, 1:4]
+
+        error = np.array(x) - np.array(x_hat)
+        return np.sqrt(np.mean(error ** 2))
+    
+    # def compute_nees(self):
+    #     """Compute the normalized estimation error squared (NEES) of the estimator.
+
+    #     Returns
+    #     -------
+    #         float
+    #             The NEES of the estimator.
+    #     """
+    #     if len(self.x) == 0 or len(self.x_hat) == 0:
+    #         return 0.0
+    #     # Check if P is defined
+    #     if not hasattr(self, 'P'):
+    #         return 0.0
+
+    #     x_hat = self.x_hat[:len(self.x)]
+
+    #     error = np.array(self.x) - np.array(x_hat)
+    #     return np.dot(error.T, np.linalg.inv(self.P)).dot(error)
+    
+    def compute_time(self):
+        """Compute the average computation time of the estimator.
+
+        Returns
+        -------
+            float
+                The average computation time of the estimator.
+        """
+        self.time = self.time[:len(self.x)]
+        return np.mean(self.time)
+
 
 class OracleObserver(Estimator):
     """Oracle observer which has access to the true state.
@@ -217,7 +274,7 @@ class OracleObserver(Estimator):
         super().__init__()
         self.canvas_title = 'Oracle Observer'
 
-    def update(self, _):
+    def _update(self, _):
         self.x_hat.append(self.x[-1])
 
 
@@ -246,7 +303,7 @@ class DeadReckoning(Estimator):
         super().__init__()
         self.canvas_title = 'Dead Reckoning'
 
-    def update(self, _):
+    def _update(self, _):
         # Ensure we only use self.u (inputs) and self.x[0] (initial state)
         if len(self.x_hat) > 0 and self.x_hat[-1][0] < self.x[-1][0]:
             # Retrieve parameters
@@ -258,7 +315,7 @@ class DeadReckoning(Estimator):
                 self.x_hat.append(self.x[0])  # Use initial state
 
             # Get last estimated state
-            t_last, theta_last, x_last, y_last, _, _ = self.x_hat[-1]
+            t_last, theta_last, x_last, y_last, left_last, right_last = self.x_hat[-1]
 
             # Find corresponding control input
             for u_t, omega_l, omega_r in self.u:
@@ -277,8 +334,13 @@ class DeadReckoning(Estimator):
             x_new = x_last + v * np.cos(theta_last) * dt
             y_new = y_last + v * np.sin(theta_last) * dt
 
+            # Predict left and right wheel positions
+            left_new = left_last + omega_l * dt
+            right_new = right_last + omega_r * dt
+
             # Append new estimate
-            self.x_hat.append([u_t, theta_new, x_new, y_new, 0, 0])
+            self.x_hat.append([u_t, theta_new, x_new, y_new, left_new, right_new])
+        
 
 
 class KalmanFilter(Estimator):
@@ -336,7 +398,7 @@ class KalmanFilter(Estimator):
 
     # noinspection DuplicatedCode
     # noinspection PyPep8Naming
-    def update(self, _):
+    def _update(self, _):
         if len(self.x_hat) > 0 and self.x_hat[-1][0] < self.x[-1][0]:
             # Get last estimated state
             last_t = self.x_hat[-1][0]
@@ -425,7 +487,7 @@ class ExtendedKalmanFilter(Estimator):
         # You may define the Q, R, and P matrices below.
 
     # noinspection DuplicatedCode
-    def update(self, _):
+    def _update(self, _):
         if len(self.x_hat) > 0 and self.x_hat[-1][0] < self.x[-1][0]:
             # TODO: Your implementation goes here!
             # You may use self.u, self.y, and self.x[0] for estimation

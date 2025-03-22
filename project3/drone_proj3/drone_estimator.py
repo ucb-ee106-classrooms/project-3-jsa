@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import time
 plt.rcParams['font.family'] = ['Arial']
 plt.rcParams['font.size'] = 14
 
@@ -71,6 +72,8 @@ class Estimator:
         self.ln_z_hat, = self.axd['z'].plot([], 'o-c', label='Estimated')
         self.canvas_title = 'N/A'
 
+        self.time = []
+
         # Defined in dynamics.py for the dynamics model
         # m is the mass and J is the moment of inertia of the quadrotor 
         self.gr = 9.81 
@@ -103,6 +106,12 @@ class Estimator:
         return self.x_hat
 
     def update(self, _):
+        start_compute_time = time.time()
+        self._update(_)
+        end_compute_time = time.time()
+        self.time.append(end_compute_time - start_compute_time)
+
+    def _update(self, _):
         raise NotImplementedError
 
     def plot_init(self):
@@ -167,6 +176,19 @@ class Estimator:
         ylim = ax.get_ylim()
         ax.set_ylim([min(min(y) * 1.05, ylim[0]), max(max(y) * 1.05, ylim[1])])
 
+    def compute_rmse(self):
+        x_hat = self.x_hat[:len(self.x)]
+
+        x = np.array(self.x)[:, :4]
+        x_hat = np.array(x_hat)[:, :4]
+
+        rmse = np.sqrt(np.mean((np.array(x) - np.array(x_hat))**2))
+        return rmse
+    
+    def compute_time(self):
+        self.time = self.time[:len(self.x)]
+        return np.mean(self.time)
+
 class OracleObserver(Estimator):
     """Oracle observer which has access to the true state.
 
@@ -182,7 +204,7 @@ class OracleObserver(Estimator):
         super().__init__(is_noisy)
         self.canvas_title = 'Oracle Observer'
 
-    def update(self, _):
+    def _update(self, _):
         self.x_hat.append(self.x[-1])
 
 
@@ -206,7 +228,7 @@ class DeadReckoning(Estimator):
         super().__init__(is_noisy)
         self.canvas_title = 'Dead Reckoning'
 
-    def update(self, _):
+    def _update(self, _):
         if len(self.x_hat) > 0:
             
             # Init estimated states
@@ -266,7 +288,7 @@ class ExtendedKalmanFilter(Estimator):
         self.P = np.eye(6) * 0.5
 
     # noinspection DuplicatedCode
-    def update(self, i):
+    def _update(self, i):
         if len(self.x_hat) > 0: #and self.x_hat[-1][0] < self.x[-1][0]:
             
             # Init estimated states
