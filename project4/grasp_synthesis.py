@@ -31,7 +31,7 @@ def synthesize_grasp(env: grasp_synthesis.AllegroHandEnv,
     ------
     New joint angles after contact and force closure adjustment
     """
-
+    #YOUR CODE HERE
 
 def joint_space_objective(env: grasp_synthesis.AllegroHandEnv, 
                           q_h: np.array,
@@ -62,6 +62,38 @@ def joint_space_objective(env: grasp_synthesis.AllegroHandEnv,
     """
     env.set_configuration(q_h)
     #YOUR CODE HERE
+
+
+def numeric_gradient(function: types.FunctionType, 
+                     q_h: np.array, 
+                     env: grasp_synthesis.AllegroHandEnv, 
+                     fingertip_names: list[str], 
+                     in_contact: bool, 
+                     eps=0.01):
+    """
+    This function approximates the gradient of the joint_space_objective
+
+    Parameters
+    ----------
+    function: function we are taking the gradient of
+    q_h: joint configuration of the hand 
+    env: AllegroHandEnv instance 
+    fingertip_names: names of the fingertips as defined in the MJCF
+    in_contact: helper variable to determine if the fingers are in contact with the object
+    eps: hyperparameter for the delta of the gradient 
+
+    Output
+    ------
+    Approximate gradient of the inputted function
+    """
+    baseline = function(q_h, env, fingertip_names, in_contact)
+    grad = np.zeros_like(q_h)
+    for i in range(len(q_h)):
+        q_h_pert = q_h.copy()
+        q_h_pert[i] += eps
+        val_pert = function(q_h_pert, env, fingertip_names, in_contact)
+        grad[i] = (val_pert - baseline) / eps
+    return grad
 
 
 def build_friction_cones(normal: np.array, mu=0.5, num_approx=4):
@@ -98,45 +130,48 @@ def build_grasp_matrix(positions: np.array, friction_cones: list, origin=np.zero
     #YOUR CODE HERE
 
 
-def numeric_gradient(function: types.FunctionType, 
-                     q_h: np.array, 
-                     env: grasp_synthesis.AllegroHandEnv, 
-                     fingertip_names: list[str], 
-                     in_contact: bool, 
-                     eps=0.01):
+def optimize_necessary_condition(G: np.array, env: grasp_synthesis.AllegroHandEnv):
     """
-    This function approximates the gradient of the joint_space_objective
-
-    Parameters
-    ----------
-    function: function we are taking the gradient of
-    q_h: joint configuration of the hand 
-    env: AllegroHandEnv instance 
-    fingertip_names: names of the fingertips as defined in the MJCF
-    in_contact: helper variable to determine if the fingers are in contact with the object
-    eps: hyperparameter for the delta of the gradient 
-
-    Output
-    ------
-    Approximate gradient of the inputted function
-    """
-    baseline = function(q_h, env, fingertip_names, in_contact)
-    grad = np.zeros_like(q_h)
-    for i in range(len(q_h)):
-        q_h_pert = q_h.copy()
-        q_h_pert[i] += eps
-        val_pert = function(q_h_pert, env, fingertip_names, in_contact)
-        grad[i] = (val_pert - baseline) / eps
-    return grad
-
-
-def l2_optimize(G: np.array, env: grasp_synthesis.AllegroHandEnv):
-    """
-    Returns the result of the L2 optimization on G
+    Returns the result of the L2 optimization on the distance from wrench origin to the
+    wrench space of G
 
     Parameters
     ----------
     G: grasp matrix
     env: AllegroHandEnv instance (can use to access physics)
-    """
 
+    Returns the minimum of the objective
+
+    Hint: use scipy.optimize.minimize
+    """
+    #YOUR CODE HERE
+    def objective():
+        pass
+
+    x0 = ...
+    bounds = ...
+
+    res = minimize(objective, x0, method='SLSQP', bounds=bounds)
+
+    return res.fun
+
+
+def optimize_sufficient_condition(G: np.array, K=20):
+    """
+    Runs the optimization from the project spec to evaluate Q- distance. 
+
+    Parameters
+    ----------
+    G: grasp matrix
+    K: number of approximations to the norm ball
+
+    Returns the Q- value
+
+    Hints:
+        -Use scipy.optimize.linprog
+        -Here's a resource with the basics: https://realpython.com/linear-programming-python/
+        -You'll have to find a way to represent the alpha's for the constraints
+            -Consider including the alphas in the linprog objective with coefficients 0 
+        -For the optimization method, do method='highs'
+    """
+    #YOUR CODE HERE

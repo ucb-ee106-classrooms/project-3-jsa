@@ -16,20 +16,22 @@ class AllegroHandEnv:
         self.physics.data.qpos[self.q_h_slice] = q_h
         self.physics.forward()
 
-    def get_fingertip_positions(self, fingertip_names: list[str]):
+    def get_contact_positions(self, body_names: list[str]):
         """
-        Input: list of fingertip names in the XML
-        Returns: (num_fingers x 3) np.array containing 
+        Input: list of the names in the XML of the bodies that are in contact
+        Returns: (num_contacts x 3) np.array containing 
         finger positions in workspace coordinates
         """
         #YOUR CODE HERE
 
-    def get_fingertip_normals(self, contact: mj._structs._MjContactList):
+    def get_contact_normals(self, contact: mj._structs._MjContactList):
         """
         Input: contact data structure that contains MuJoCo contact information
-        Returns the normal vector for each finger that's in contact with the ball
+        Returns the normal vector for each geom that's in contact with the ball
         
-        Tip: See information about the mjContact_ struct here: https://mujoco.readthedocs.io/en/stable/APIreference/APItypes.html#mjcontact
+        Tip: 
+            -See information about the mjContact_ struct here: https://mujoco.readthedocs.io/en/stable/APIreference/APItypes.html#mjcontact
+            -Get normals for all the geoms in contact with the ball, not just the fingertips
         """
         #YOUR CODE HERE
 
