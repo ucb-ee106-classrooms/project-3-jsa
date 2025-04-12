@@ -21,8 +21,8 @@ def clip_to_valid_state(physics: dm_control.mjcf.physics.Physics, qpos: np.array
 def quaternion_error_naive(current_quat: np.array, target_quat: np.array):
     """
     Rough orientation error between two quaternions.
-    For small angles, the imaginary part ~ (axis*angle/2).
-    This is just a rough measure, so you might want to consider using
+    This is just a rough measure and doesn't work well for
+    large angles, so you might want to consider using
     something more advanced to compare quaternions.
     """
     q_diff = quat_multiply(target_quat, quat_conjugate(current_quat))
