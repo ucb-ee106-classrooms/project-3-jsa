@@ -4,7 +4,7 @@ import dm_control
 from utils import *
 
 # Inspired by: https://alefram.github.io/posts/Basic-inverse-kinematics-in-Mujoco
-class LevenbegMarquardtIK:
+class LevenbergMarquardtIK:
     
     def __init__(self, model: dm_control.mujoco.wrapper.core.MjModel, 
                  data: dm_control.mujoco.wrapper.core.MjData, 
