@@ -51,5 +51,27 @@ class LevenbergMarquardtIK:
             are possible 
         """
         #YOUR CODE HERE
-    
+
+        numbodies = len(body_ids)
+
+        for ind in range(numbodies):
+            # consider each body separately
+            body_id = body_ids[ind]
+            mj.mj_forward(self.model, self.data)
+            
+            current_pose = self.data.body(body_id).xpos
+            target_pose = target_pose[ind]
+
+            # only currently considering position error, not quat error yet
+            error = np.subtract(target_pose, current_pose)
+
+            while (np.linalg.norm(error) >= self.tol):
+                # calc jacobian
+                mj.mj_jac(self.model, self.data, self.jacp, self.jacr, target_pose, body_id)
+
+                # calc grad
+                grad = self.alpha * self.jacp.T @ error
+
+                # calc step
+
     
