@@ -51,27 +51,48 @@ class LevenbergMarquardtIK:
             are possible 
         """
         #YOUR CODE HERE
+        for i in range(self.max_steps):
+            J_blocks, error_blocks = self.ContructBlocks(target_positions, body_ids)
 
-        numbodies = len(body_ids)
+            # Stack Jacobians and errors
+            J_full = np.vstack(J_blocks)     # shape: (3*num_fingers, nq)
+            error_full = np.concatenate(error_blocks)  # shape: (3*num_fingers,)
 
-        for ind in range(numbodies):
-            # consider each body separately
-            body_id = body_ids[ind]
+            if np.linalg.norm(error_full) < self.tol:
+                break
+
+            # Solve damped least squares
+            JTJ = J_full.T @ J_full
+            delta_q = np.linalg.solve(JTJ + self.damping * np.eye(JTJ.shape[0]), J_full.T @ error_full)
+
+            # Apply update
+            self.data.qpos[:] += self.step_size * delta_q
+            self.check_joint_limits(self.data.qpos)
             mj.mj_forward(self.model, self.data)
+
+        return np.copy(self.data.qpos)
+    
+    def ContructBlocks(self, target_positions, body_ids):
+        J_blocks = []
+        error_blocks = []
+
+        for i, body_id in enumerate(body_ids):
+            # Forward kinematics
+            mj.mj_forward(self.model, self.data)
+
+            # zero the values to prevent accumulation 
+            self.jacp[:] = 0
+            self.jacr[:] = 0
             
-            current_pose = self.data.body(body_id).xpos
-            target_pose = target_pose[ind]
+            # Compute Jacobian
+            mj.mj_jacBodyCom(self.model, self.data, self.jacp, self.jacr, body_id)
+            J_blocks.append(np.copy(self.jacp))  # shape: (3, nq)
 
-            # only currently considering position error, not quat error yet
-            error = np.subtract(target_pose, current_pose)
+            # Compute error
+            current_pos = np.copy(self.data.body(body_id).xpos)
+            error = target_positions[i] - current_pos
+            error_blocks.append(error)
 
-            while (np.linalg.norm(error) >= self.tol):
-                # calc jacobian
-                mj.mj_jac(self.model, self.data, self.jacp, self.jacr, target_pose, body_id)
-
-                # calc grad
-                grad = self.alpha * self.jacp.T @ error
-
-                # calc step
+        return J_blocks, error_blocks
 
     
