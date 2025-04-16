@@ -52,6 +52,7 @@ class LevenbergMarquardtIK:
         """
         #YOUR CODE HERE
         for i in range(self.max_steps):
+            print("iteration:", i)
             J_blocks, error_blocks = self.ContructBlocks(target_positions, body_ids)
 
             # Stack Jacobians and errors
@@ -66,9 +67,9 @@ class LevenbergMarquardtIK:
             delta_q = np.linalg.solve(JTJ + self.damping * np.eye(JTJ.shape[0]), J_full.T @ error_full)
 
             # Apply update
-            self.data.qpos[:] += self.step_size * delta_q
-            self.check_joint_limits(self.data.qpos)
-            mj.mj_forward(self.model, self.data)
+            self.data.qpos[1:] += self.step_size * delta_q
+            self.data.qpos = clip_to_valid_state(self.physics, self.data.qpos)
+            mj.mj_forward(self.physics.model.ptr, self.physics.data.ptr)
 
         return np.copy(self.data.qpos)
     
@@ -78,14 +79,15 @@ class LevenbergMarquardtIK:
 
         for i, body_id in enumerate(body_ids):
             # Forward kinematics
-            mj.mj_forward(self.model, self.data)
+            mj.mj_forward(self.physics.model.ptr, self.physics.data.ptr)
 
+            id_num = self.model.body(body_id).id
             # zero the values to prevent accumulation 
             self.jacp[:] = 0
             self.jacr[:] = 0
             
             # Compute Jacobian
-            mj.mj_jacBodyCom(self.model, self.data, self.jacp, self.jacr, body_id)
+            mj.mj_jacBodyCom(self.physics.model.ptr, self.physics.data.ptr, self.jacp, self.jacr, id_num)
             J_blocks.append(np.copy(self.jacp))  # shape: (3, nq)
 
             # Compute error
