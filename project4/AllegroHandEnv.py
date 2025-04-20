@@ -170,3 +170,74 @@ class AllegroHandEnvSphere(AllegroHandEnv):
         return (np.stack(pos_all,   axis=0),
                 np.stack(normal_all, axis=0))
     
+
+class AllegroHandEnvCube(AllegroHandEnv):
+    def __init__(self, physics: dm_control.mjcf.physics.Physics, 
+                 cube_center: int, 
+                 cube_radius: int, 
+                 q_h_slice: slice, 
+                 object_name: str):
+        super().__init__(physics, q_h_slice, object_name)
+        self.physics = physics
+        self.cube_center = cube_center
+        self.cube_radius = cube_radius
+        self.q_h_slice = q_h_slice
+        self.num_fingers = 4
+    
+    def cube_surface_distance(self, pos: np.array, center: np.array, radius: int):
+        """
+        Returns the distance from pos to the surface of a cube with a specified
+        psuedo radius and center
+        """
+        maxpoint = center + np.array([radius, radius, radius])
+        minpoint = center - np.array([radius, radius, radius])
+        
+        closeVec = np.maximum(np.array([0,0,0]), np.maximum(minpoint - pos, pos - maxpoint))
+
+        d = np.linalg.norm(closeVec)
+        return d
+    
+    def fingertip_distances(self, finger_names: list[str]) -> np.ndarray:
+        """
+        Returns an array (len(finger_names),) of signed distances from each
+        fingertip to the cube surface.
+        """
+        tip_pos = self.get_contact_positions(finger_names)  # or use xpos lookup
+        if len(tip_pos) == 0:
+            # if no contacts yet, fall back to site positions
+            tip_pos = np.vstack([
+                self.physics.named.data.xpos[name].copy()
+                for name in finger_names
+            ])
+        d = [self.cube_surface_distance(p, self.cube_center,
+                                          self.cube_radius) for p in tip_pos]
+        return np.asarray(d)
+    
+    def contact_pos_normals(self, finger_names: list[str]):
+        """
+        Returns two arrays:
+            positions : (#contacts, 3)
+            normals   : (#contacts, 3)
+        Only contacts involving *either* the cube or the fingertips listed.
+        """
+        pos_all   = []
+        normal_all = []
+
+        ncon = self.physics.data.ncon
+        for i in range(ncon):
+            c = self.physics.data.contact[i]
+            bid1 = self.physics.model.geom_bodyid[c.geom1]
+            bid2 = self.physics.model.geom_bodyid[c.geom2]
+            bname1 = self.physics.model.body(bid1).name
+            bname2 = self.physics.model.body(bid2).name
+
+            if (bname1 in finger_names or bname2 in finger_names or
+                bname1 == self.object_name or bname2 == self.object_name):
+                pos_all.append(c.pos.copy())
+                normal_all.append(c.frame[6:9].copy())
+
+        if len(pos_all) == 0:
+            return (np.zeros((0, 3)), np.zeros((0, 3)))
+        return (np.stack(pos_all,   axis=0),
+                np.stack(normal_all, axis=0))
+    

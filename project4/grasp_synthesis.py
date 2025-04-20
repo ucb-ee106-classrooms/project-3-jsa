@@ -38,6 +38,7 @@ def synthesize_grasp(env: grasp_synthesis.AllegroHandEnv,
     """
     #YOUR CODE HERE
     q_h = q_h_init.copy()
+    loss = np.array([])
     in_contact = False
 
     for it in range(max_iters):
@@ -54,12 +55,14 @@ def synthesize_grasp(env: grasp_synthesis.AllegroHandEnv,
         q_h -= lr * grad
         env.set_configuration(q_h)
 
+        # loss updating
+        loss = np.append(loss, np.array([f(q_h)]))
         if f(q_h) < 1e-6:
             break
         if it % 50 == 0:
             print(f"[{it:4d}] loss={f(q_h):8.3e} | in_contact={in_contact}")
 
-    return q_h
+    return q_h, loss
 
 def joint_space_objective(env: grasp_synthesis.AllegroHandEnv, 
                           q_h: np.array,
